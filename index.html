@@ -233,11 +233,11 @@ const state={frags:new Set(), talked:new Set(), gateOpen:false, playing:false, f
    ============================================================ */
 const MODELS={
   player:{url:'', scale:1, y:0},
-  kona:  {url:'./kona.glb', scale:0.75, y:0},
+  kona:  {url:'./kona.glb', scale:0.75, y:0.1},
   mimi:  {url:'./mimi.glb', scale:1, y:0},
   ikaika:{url:'', scale:1, y:0},
-  andres:{url:'', scale:1, y:0},
-  ale:   {url:'', scale:1, y:0}
+  andres:{url:'./andres.glb', scale:1, y:0},
+  ale:   {url:'./ale.glb', scale:1.15, y:0}
 };
 const mixers=[]; const charAnims={};
 function tryLoadModel(id, group){
@@ -448,7 +448,7 @@ function addNPC(id, pos, opts){
   tryLoadModel(id, fig);
   return fig;
 }
-addNPC('kona', new THREE.Vector3(ARENA.x+5, 0, ARENA.z+13), {height:1.95, bodyColor:0x24303a, accent:0x7fd4e5, emissive:.9, name:'KONA-7'});
+addNPC('kona', new THREE.Vector3(ARENA.x+9, 0, ARENA.z+20), {height:1.95, bodyColor:0x24303a, accent:0x7fd4e5, emissive:.9, name:'KONA-7'});
 addNPC('mimi', new THREE.Vector3(GARDEN.x-2, 0, GARDEN.z+3), {height:1.65, bodyColor:0x3a2230, accent:0xe5b05e, emissive:.9, name:'MIMI'});
 const ikaikaFig=addNPC('ikaika', new THREE.Vector3(SAND.x, 0, SAND.z), {height:1.15, bodyColor:0x4a3020, accent:0xe59a5e, emissive:1.0, name:'IKAIKA'});
 addNPC('andres', new THREE.Vector3(ARENA.x, 0, ARENA.z+21), {height:1.85, bodyColor:0x1f1a14, accent:0xc87f4a, emissive:.8, name:'ANDRÉS-7'});
