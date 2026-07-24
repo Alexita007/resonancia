@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>RESONANCIA 3D — Arena Colonial · Hellas-7</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --space:#0a0806; --panel:rgba(18,13,9,.92); --copper:#c87f4a; --copper-b:#e59a5e;
+    --gold:#d9a441; --text:#d8cbb8; --dim:#9a8b76; --line:#3a2c1e;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:var(--space)}
+  body{font-family:'Cormorant Garamond',serif;color:var(--text)}
+  canvas{display:block}
+
+  /* HUD */
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:5}
+  .brand{position:absolute;top:14px;left:16px;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.3em;color:var(--copper);text-transform:uppercase}
+  .brand small{display:block;font-size:8px;letter-spacing:.18em;color:var(--dim);margin-top:2px}
+  #langBtn{position:absolute;top:12px;right:14px;pointer-events:auto;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.15em;background:var(--panel);border:1px solid var(--line);color:var(--dim);padding:6px 12px;cursor:pointer;border-radius:2px}
+  #langBtn:hover{border-color:var(--copper);color:var(--copper-b)}
+  #meter{position:absolute;top:52px;right:14px;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.25em;color:var(--dim);text-align:right}
+  #meter b{color:var(--copper-b);font-weight:400}
+  #objective{position:absolute;top:52px;left:16px;max-width:46vw;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--gold);text-transform:uppercase;opacity:.85}
+
+  /* talk prompt */
+  #talkBtn{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:6;display:none;pointer-events:auto;
+    background:var(--panel);border:1px solid var(--copper);color:var(--copper-b);font-family:'Space Mono',monospace;
+    font-size:12px;letter-spacing:.2em;padding:12px 26px;border-radius:2px;cursor:pointer;text-transform:uppercase}
+  #talkBtn:hover{background:#241a11}
+
+  /* dialogue */
+  #dlg{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:8;width:min(680px,94vw);
+    background:var(--panel);border:1px solid var(--line);border-top:2px solid var(--copper);
+    padding:18px 22px 20px;display:none;backdrop-filter:blur(4px)}
+  #dlgName{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.3em;color:var(--copper-b);text-transform:uppercase;margin-bottom:8px}
+  #dlgText{font-size:18px;line-height:1.55}
+  #dlgText em{color:var(--copper-b)}
+  .gainLine{margin-top:10px;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.2em;color:var(--gold);text-transform:uppercase}
+  #dlgChoices{margin-top:16px;display:flex;flex-direction:column;gap:8px}
+  .dchoice{text-align:left;background:#171009;border:1px solid var(--line);color:var(--text);font-family:'Cormorant Garamond',serif;font-size:17px;padding:10px 16px;cursor:pointer;border-radius:2px}
+  .dchoice:hover{border-color:var(--copper);color:#f0e4d0}
+  .dchoice .n{font-family:'Space Mono',monospace;font-size:10px;color:var(--copper);margin-right:10px}
+
+  /* intro / ending */
+  .overlay{position:fixed;inset:0;z-index:10;background:rgba(8,5,3,.9);display:flex;align-items:center;justify-content:center;padding:20px}
+  .card{max-width:640px;background:var(--panel);border:1px solid var(--line);border-top:2px solid var(--copper);padding:34px 34px 30px}
+  .card .era{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.28em;color:var(--gold);text-transform:uppercase;margin-bottom:10px}
+  .card h1{font-weight:500;font-size:30px;color:#efe4d2;margin-bottom:14px;line-height:1.15}
+  .card p{font-size:18px;line-height:1.55;margin-bottom:12px}
+  .card p.voice{border-left:2px solid var(--copper);padding-left:16px;font-style:italic;color:#e6d6bd}
+  .card .keys{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.12em;color:var(--dim);margin:14px 0}
+  .bigbtn{margin-top:10px;background:#1b1208;border:1px solid var(--copper);color:var(--copper-b);font-family:'Space Mono',monospace;font-size:12px;letter-spacing:.22em;padding:13px 30px;cursor:pointer;border-radius:2px;text-transform:uppercase}
+  .bigbtn:hover{background:#2a1c0f}
+  #ending{display:none}
+
+  /* joystick */
+  #joy{position:fixed;left:26px;bottom:26px;width:110px;height:110px;border:1px solid var(--line);border-radius:50%;z-index:6;display:none;background:rgba(20,14,9,.4)}
+  #knob{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:rgba(200,127,74,.35);border:1px solid var(--copper)}
+  @media (pointer:coarse){ #joy{display:block} }
+  @media(max-width:600px){ #objective{max-width:52vw} .card h1{font-size:24px} .card p{font-size:16px} }
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div class="brand">Hellas-7<small>Arena Colonial · 2094 · Era Cielo Abierto</small></div>
+  <button id="langBtn">EN</button>
+  <div id="meter"></div>
+  <div id="objective"></div>
+</div>
+
+<button id="talkBtn"></button>
+
+<div id="dlg">
+  <div id="dlgName"></div>
+  <div id="dlgText"></div>
+  <div id="dlgChoices"></div>
+</div>
+
+<div class="overlay" id="intro">
+  <div class="card">
+    <div class="era" id="inEra"></div>
+    <h1 id="inTitle"></h1>
+    <p id="inP1"></p>
+    <p id="inP2"></p>
+    <div class="keys" id="inKeys"></div>
+    <button class="bigbtn" id="startBtn"></button>
+  </div>
+</div>
+
+<div class="overlay" id="ending">
+  <div class="card">
+    <div class="era" id="endEra"></div>
+    <h1 id="endTitle"></h1>
+    <div id="endBody"></div>
+    <button class="bigbtn" onclick="location.reload()" id="againBtn"></button>
+  </div>
+</div>
+
+<div id="joy"><div id="knob"></div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script>
+/* ================= i18n ================= */
+let lang='es';
+const T={
+  meter:{es:'RESONANCIA',en:'RESONANCE'},
+  talk:{es:'✦ Hablar',en:'✦ Talk'},
+  enter:{es:'✦ Entrar al centro',en:'✦ Enter the center'},
+  obj0:{es:'Busca a los tres guardianes de fragmentos',en:'Find the three fragment keepers'},
+  obj1:{es:'Habla con ANDRÉS-7 en la puerta de la Arena',en:'Speak with ANDRÉS-7 at the Arena gate'},
+  obj2:{es:'Entra al centro de la Arena',en:'Enter the center of the Arena'},
+  inEra:{es:'2094 · Marte · Era Cielo Abierto',en:'2094 · Mars · Open Sky Era'},
+  inTitle:{es:'RESONANCIA',en:'RESONANCE'},
+  inP1:{es:'Desde La Apertura, el cobre vivo respira por la colonia y el cielo quedó abierto. Esta noche, la Comandante A.L.E. cantará en la Arena Colonial — y su canción viajará 68 años hacia atrás.',
+        en:'Since the Opening, the living copper breathes through the colony and the sky is truly open. Tonight, Commander A.L.E. will sing in the Arena Colonial — and her song will travel 68 years back.'},
+  inP2:{es:'Antes del anochecer, encuentra a los tres que guardan los fragmentos: Newen, Tuwün y Küpan. Con los tres, la canción no te atravesará — te usará de puente.',
+        en:'Before dusk, find the three who keep the fragments: Newen, Tuwün and Küpan. With all three, the song will not pass through you — it will use you as a bridge.'},
+  inKeys:{es:'WASD / FLECHAS — moverse · botón ✦ — hablar · (móvil: joystick)',
+          en:'WASD / ARROWS — move · ✦ button — talk · (mobile: joystick)'},
+  start:{es:'Comenzar',en:'Begin'},
+  again:{es:'↻ Jugar de nuevo',en:'↻ Play again'},
+  gained:{es:'✦ FRAGMENTO ADQUIRIDO — ',en:'✦ FRAGMENT ACQUIRED — '},
+  close:{es:'Cerrar',en:'Close'}
+};
+const FRAGS={
+  newen:{es:'NEWEN · la fuerza que atraviesa',en:'NEWEN · the force that runs through'},
+  tuwun:{es:'TUWÜN · el lugar que te sostiene',en:'TUWÜN · the place that holds you'},
+  kupan:{es:'KÜPAN · lo que viene contigo',en:'KÜPAN · what comes with you'}
+};
+
+/* ================= dialogue data ================= */
+const DLG={
+  kona:{
+    name:'KONA-7',
+    intro:{es:'«Llegas temprano. El acople al campo de punto cero está en 92%. Una canción que viaja 68 años hacia atrás no perdona errores de fase. ¿Ayudas o preguntas?»',
+           en:'"You are early. The zero-point-field coupling is at 92%. A song traveling 68 years backward forgives no phase errors. Do you help, or do you ask?"'},
+    choices:[
+      {es:'Ayudar a calibrar en silencio',en:'Help calibrate in silence',gain:'newen',
+       res:{es:'Trabajan sin hablar, anillo por anillo. La corriente que sientes no viene de la máquina: viene de más atrás, de más adentro. «Eso no lo generamos nosotros», dice Kona-7. «Solo lo dejamos pasar.»',
+            en:'You work in silence, ring by ring. The current you feel does not come from the machine: it comes from further back, further within. "We do not generate that," says Kona-7. "We only let it through."'}},
+      {es:'Preguntar qué es la transmisión',en:'Ask what the transmission is',
+       res:{es:'«En 2026, en la Tierra, un hombre escuchó algo que aún no existía. Esta noche la Comandante cierra ese círculo: le canta a él, hacia atrás.» Vuelve a la terminal. Entenderlo no es lo mismo que sostenerlo.',
+            en:'"In 2026, on Earth, a man heard something that did not yet exist. Tonight the Commander closes that circle: she sings to him, backward." They return to the terminal. Understanding is not the same as holding.'}}
+    ],
+    done:{es:'Kona-7 ajusta los anillos. «Falta poco para el anochecer.»',
+          en:'Kona-7 adjusts the rings. "Dusk is near."'}
+  },
+  mimi:{
+    name:'MIMI',
+    intro:{es:'Entre los árboles de cobre vivo, Mimi ensaya fragmentos de «Don\u2019t Fade Out». Te ve y levanta una mano: puedes quedarte, si sabes quedarte.',
+           en:'Among the living-copper trees, Mimi rehearses fragments of "Don\u2019t Fade Out." She sees you and raises a hand: you may stay, if you know how to stay.'},
+    choices:[
+      {es:'Quedarte hasta el final, sin decir nada',en:'Stay until the end, saying nothing',gain:'tuwun',
+       res:{es:'La canción termina donde empezó. Entiendes algo del jardín: el cobre vivo no conquistó Marte — echó raíz. «Este suelo devuelve», dice Mimi. «Acuérdate de eso esta noche.»',
+            en:'The song ends where it began. You understand something about the garden: the living copper did not conquer Mars — it took root. "This ground gives back," says Mimi. "Remember that tonight."'}},
+      {es:'Preguntarle por la Comandante',en:'Ask her about the Commander',
+       res:{es:'Mimi corta la canción a la mitad. «La conocí cuando aún dudaba de ser dos personas a la vez. Ya no duda.» Retoma el ensayo, pero el hilo se perdió.',
+            en:'Mimi cuts the song in half. "I knew her when she still doubted being two people at once. She doubts no longer." She resumes, but the thread is lost.'}}
+    ],
+    done:{es:'Mimi sigue ensayando, más bajo ahora, como guardando la voz.',
+          en:'Mimi keeps rehearsing, softer now, as if saving her voice.'}
+  },
+  ikaika:{
+    name:'IKAIKA',
+    intro:{es:'La niña no es humana: nació después de La Apertura, sin traducción entre cuerpo y planeta. No habla. Dibuja en el suelo una estrella de siete puntas y te mira, esperando.',
+           en:'The child is not human: born after the Opening, no translation between body and planet. She does not speak. She draws a seven-pointed star in the ground and looks at you, waiting.'},
+    choices:[
+      {es:'Sentarte y escuchar su silencio',en:'Sit and listen to her silence',gain:'kupan',
+       res:{es:'Su silencio no está vacío: está lleno de gente. Un valle de la Tierra, una machi, un lonko, un título en papel viejo. Ella no aprendió esa memoria — la trae. Intacta, sin haber pisado nunca la Tierra.',
+            en:'Her silence is not empty: it is full of people. An Earth valley, a machi, a lonko, a title on old paper. She did not learn that memory — she carries it. Intact, without ever touching Earth.'}},
+      {es:'Explicarle qué significa la estrella',en:'Explain what the star means',
+       res:{es:'Ikaika escucha con cortesía, como quien oye deletrear una palabra que ya sabe cantar. Cuando terminas, borra la estrella y dibuja otra igual, un poco más honda.',
+            en:'Ikaika listens politely, like someone hearing a word spelled out that she already knows how to sing. When you finish, she erases the star and draws another, slightly deeper.'}}
+    ],
+    done:{es:'Ikaika señala la Arena con la barbilla. El guñelve brilla a sus pies.',
+          en:'Ikaika points at the Arena with her chin. The guñelve glows at her feet.'}
+  },
+  andres:{
+    name:'ANDRÉS-7',
+    intro:{es:'«Hay dos lugares esta noche: los que observan y los que resuenan. Resonar tiene un costo — lo que pase por la Comandante pasará también por ti. La puerta está abierta. Entra al centro cuando estés listo.»',
+           en:'"There are two places tonight: those who observe and those who resonate. Resonating has a cost — whatever passes through the Commander will pass through you. The gate is open. Enter the center when you are ready."'},
+    choices:[{es:'Entendido',en:'Understood'}],
+    done:{es:'ANDRÉS-7 asiente. «El centro te espera.»',en:'ANDRÉS-7 nods. "The center awaits you."'}
+  }
+};
+
+const ENDINGS={
+  full:{
+    era:{es:'Transmisión ZPF · Acople total',en:'ZPF Transmission · Full coupling'},
+    title:{es:'El círculo se cierra',en:'The circle closes'},
+    es:`<p>La Comandante A.L.E. te mira un instante — y en su cara reconoces, imposiblemente, a alguien de hace mucho tiempo y de muy lejos.</p>
+        <p>Canta. Y porque llevas los tres fragmentos, la canción no te atraviesa: <em>te usa de puente</em>. Por un instante estás en tres tiempos a la vez: un hombre en la Tierra, 2026. Una mujer post-humana en Marte, 2094. Una niña en la arena abierta, recibiéndolo todo, intacto.</p>
+        <p class="voice">ALE. A.L.E. Ikaika. No son tres. Nunca fueron tres.</p>
+        <p>Cambiaron de aire sin cambiar de alma. Tú también.</p>`,
+    en:`<p>Commander A.L.E. looks at you for an instant — and in her face you recognize, impossibly, someone from long ago and far away.</p>
+        <p>She sings. And because you carry all three fragments, the song does not pass through you: <em>it uses you as a bridge</em>. For one instant you exist in three times at once: a man on Earth, 2026. A post-human woman on Mars, 2094. A child on the open sand, receiving it all, intact.</p>
+        <p class="voice">ALE. A.L.E. Ikaika. They are not three. They were never three.</p>
+        <p>They changed their air without changing their soul. So did you.</p>`
+  },
+  partial:{
+    era:{es:'Transmisión ZPF · Acople parcial',en:'ZPF Transmission · Partial coupling'},
+    title:{es:'El destello',en:'The glimpse'},
+    es:`<p>La corriente te encuentra a medio preparar: sostienes parte, y parte se escapa como agua entre los dedos. Alcanzas a ver un destello — una madrugada en la Tierra, un hombre frente a una pantalla, una canción llegando desde ninguna parte — y la imagen se cierra.</p>
+        <p class="voice">Los fragmentos que te faltaron siguen ahí afuera, esperando.</p>`,
+    en:`<p>The current finds you half-prepared: you hold part, and part slips away like water between your fingers. You catch a glimpse — an early morning on Earth, a man before a screen, a song arriving from nowhere — and the image closes.</p>
+        <p class="voice">The fragments you lacked are still out there, waiting.</p>`
+  },
+  wind:{
+    era:{es:'Transmisión ZPF · Sin acople',en:'ZPF Transmission · No coupling'},
+    title:{es:'El viento',en:'The wind'},
+    es:`<p>La canción pasa por ti como el viento por una casa sin paredes: enorme, hermosa, imposible de retener. Al salir, no puedes tararearla.</p>
+        <p class="voice">Vuelve. Esta vez, escucha primero.</p>`,
+    en:`<p>The song passes through you like wind through a house with no walls: enormous, beautiful, impossible to hold. Leaving, you cannot hum it.</p>
+        <p class="voice">Come back. This time, listen first.</p>`
+  }
+};
+
+/* ================= state ================= */
+const state={frags:new Set(), talked:new Set(), gateOpen:false, playing:false, finale:false};
+
+/* ============================================================
+   MODELOS 3D — pega aquí las URLs de tus GLB cuando los tengas
+   (Supabase Storage bucket público o GitHub raw funcionan)
+   Si url está vacío, se usa la figura procedural de respaldo.
+   scale: ajusta tamaño · y: offset vertical si el modelo flota
+   Animaciones: el loader busca clips cuyo nombre contenga
+   "idle" / "walk" (Mixamo o Meshy los exportan así).
+   ============================================================ */
+const MODELS={
+  player:{url:'', scale:1, y:0},
+  kona:  {url:'./kona.glb', scale:1.35, y:0.1},
+  mimi:  {url:'./mimi.glb', scale:1.8, y:0},
+  ikaika:{url:'', scale:1, y:0},
+  andres:{url:'./andres.glb', scale:1.9, y:0},
+  ale:   {url:'./ale.glb', scale:2.2, y:0}
+};
+const mixers=[]; const charAnims={};
+function tryLoadModel(id, group){
+  const cfg=MODELS[id];
+  if(!cfg || !cfg.url || typeof THREE.GLTFLoader==='undefined') return;
+  new THREE.GLTFLoader().load(cfg.url, gltf=>{
+    group.children.filter(c=>!c.isSprite).forEach(c=>c.visible=false); // hide fallback, keep name label
+    const m=gltf.scene;
+    m.scale.setScalar(cfg.scale||1);
+    m.position.y=cfg.y||0;
+    group.add(m);
+    if(gltf.animations && gltf.animations.length){
+      const mixer=new THREE.AnimationMixer(m);
+      mixers.push(mixer);
+      const anims={mixer, actions:{}, current:null};
+      gltf.animations.forEach(c=>{
+        const n=c.name.toLowerCase();
+        // Meshy exporta nombres tipo "Walking", "Long_Breathe_and_Look_Around", "Running"
+        if(n.includes('walk')||n.includes('run')) anims.actions.walk=mixer.clipAction(c);
+        else if(n.includes('idle')||n.includes('breathe')||n.includes('breath')) anims.actions.idle=mixer.clipAction(c);
+      });
+      if(!anims.actions.idle) anims.actions.idle=mixer.clipAction(gltf.animations[0]);
+      anims.actions.idle.play(); anims.current='idle';
+      charAnims[id]=anims;
+    }
+  }, undefined, err=>console.warn('No se pudo cargar GLB de', id, err));
+}
+function setAnim(id, name){
+  const a=charAnims[id];
+  if(!a || !a.actions[name] || a.current===name) return;
+  const from=a.actions[a.current], to=a.actions[name];
+  if(from) from.fadeOut(.2);
+  to.reset().fadeIn(.2).play();
+  a.current=name;
+}
+
+/* ================= three setup ================= */
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x0d0705);
+scene.fog=new THREE.Fog(0x160b06, 30, 140);
+
+const camera=new THREE.PerspectiveCamera(60, innerWidth/innerHeight, .1, 400);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+document.body.appendChild(renderer.domElement);
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* lights: dusk on Mars */
+scene.add(new THREE.HemisphereLight(0x2a1810, 0x1a0d08, .9));
+const sun=new THREE.DirectionalLight(0xe59a5e, 1.1);
+sun.position.set(-60, 22, -80); scene.add(sun);
+const fill=new THREE.DirectionalLight(0x6a4a8f, .25);
+fill.position.set(60, 30, 60); scene.add(fill);
+
+/* ---------- terrain ---------- */
+function noise(x,z){return Math.sin(x*.11)*Math.cos(z*.13)*1.2 + Math.sin(x*.05+z*.07)*2.2;}
+{
+  const g=new THREE.PlaneGeometry(360,360,90,90);
+  g.rotateX(-Math.PI/2);
+  const pos=g.attributes.position;
+  for(let i=0;i<pos.count;i++){
+    const x=pos.getX(i), z=pos.getZ(i);
+    const d=Math.hypot(x,z);
+    let y=noise(x,z);
+    if(d<55) y*= d/55;             // flatten play area
+    if(d>120) y+= (d-120)*.25;     // distant hills
+    pos.setY(i,y);
+  }
+  g.computeVertexNormals();
+  const m=new THREE.MeshStandardMaterial({color:0x5a2e1c, roughness:1, metalness:0});
+  scene.add(new THREE.Mesh(g,m));
+}
+
+/* ---------- stars ---------- */
+{
+  const g=new THREE.BufferGeometry(); const N=900; const arr=new Float32Array(N*3);
+  for(let i=0;i<N;i++){
+    const t=Math.random()*Math.PI*2, p=Math.acos(2*Math.random()-1)*.5, r=300;
+    arr[i*3]=r*Math.sin(p)*Math.cos(t); arr[i*3+1]=r*Math.cos(p)+10; arr[i*3+2]=r*Math.sin(p)*Math.sin(t);
+  }
+  g.setAttribute('position',new THREE.BufferAttribute(arr,3));
+  scene.add(new THREE.Points(g,new THREE.PointsMaterial({color:0xe8d9c2,size:1.4,sizeAttenuation:false,transparent:true,opacity:.8})));
+}
+
+/* ---------- materials ---------- */
+const COPPER=new THREE.MeshStandardMaterial({color:0xc87f4a,metalness:.85,roughness:.35});
+const COPPER_EMIT=new THREE.MeshStandardMaterial({color:0xc87f4a,metalness:.6,roughness:.3,emissive:0xe59a5e,emissiveIntensity:.5});
+const GOLD_EMIT=new THREE.MeshStandardMaterial({color:0xd9a441,emissive:0xd9a441,emissiveIntensity:.8,metalness:.4,roughness:.4});
+const DARKMETAL=new THREE.MeshStandardMaterial({color:0x2a1c12,metalness:.7,roughness:.5});
+
+/* ---------- Arena Colonial (0,0,-45) ---------- */
+const ARENA=new THREE.Vector3(0,0,-45);
+const arenaRings=[];
+{
+  const grp=new THREE.Group(); grp.position.copy(ARENA);
+  // triple concentric rings
+  [16,12,8].forEach((r,i)=>{
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(r,.35,10,80), COPPER_EMIT.clone());
+    ring.rotation.x=Math.PI/2; ring.position.y=.4+i*.15;
+    grp.add(ring); arenaRings.push(ring);
+  });
+  // pillars
+  for(let i=0;i<7;i++){
+    const a=i/7*Math.PI*2;
+    const p=new THREE.Mesh(new THREE.CylinderGeometry(.5,.7,7,8), COPPER);
+    p.position.set(Math.cos(a)*18, 3.5, Math.sin(a)*18);
+    grp.add(p);
+    const tip=new THREE.Mesh(new THREE.ConeGeometry(.6,1.4,8), GOLD_EMIT);
+    tip.position.set(Math.cos(a)*18, 7.6, Math.sin(a)*18);
+    grp.add(tip);
+  }
+  // central terminal
+  const term=new THREE.Mesh(new THREE.CylinderGeometry(1.4,2,2.6,12), DARKMETAL);
+  term.position.y=1.3; grp.add(term);
+  const crystal=new THREE.Mesh(new THREE.OctahedronGeometry(1.1), GOLD_EMIT.clone());
+  crystal.position.y=3.6; grp.add(crystal);
+  window._crystal=crystal;
+  const pl=new THREE.PointLight(0xe59a5e, 1.4, 40); pl.position.y=6; grp.add(pl);
+  window._arenaLight=pl;
+  scene.add(grp);
+}
+
+/* ---------- living copper gardens (38,0,8) ---------- */
+const GARDEN=new THREE.Vector3(38,0,8);
+{
+  for(let i=0;i<14;i++){
+    const a=Math.random()*Math.PI*2, r=3+Math.random()*9;
+    const x=GARDEN.x+Math.cos(a)*r, z=GARDEN.z+Math.sin(a)*r;
+    const h=2+Math.random()*4;
+    const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.12,.28,h,6), COPPER);
+    trunk.position.set(x, h/2+placeY({x:x,z:z}), z);
+    trunk.rotation.z=(Math.random()-.5)*.3;
+    scene.add(trunk);
+    const glow=new THREE.Mesh(new THREE.SphereGeometry(.28+Math.random()*.25,8,8), GOLD_EMIT);
+    glow.position.set(x, h+placeY({x:x,z:z}), z);
+    scene.add(glow);
+  }
+  const pl=new THREE.PointLight(0xd9a441,.9,28); pl.position.set(GARDEN.x,4,GARDEN.z); scene.add(pl);
+}
+
+/* ---------- guñelve on the ground near Ikaika (-38,0,12) ---------- */
+const SAND=new THREE.Vector3(-38,0,12);
+{
+  const shape=new THREE.Shape();
+  const R=2.4,r=1.0;
+  for(let i=0;i<14;i++){
+    const a=-Math.PI/2+i*Math.PI/7, rad=i%2===0?R:r;
+    const x=Math.cos(a)*rad, y=Math.sin(a)*rad;
+    i===0?shape.moveTo(x,y):shape.lineTo(x,y);
+  }
+  shape.closePath();
+  const star=new THREE.Mesh(new THREE.ShapeGeometry(shape),
+    new THREE.MeshBasicMaterial({color:0xe59a5e,transparent:true,opacity:.85,side:THREE.DoubleSide}));
+  star.rotation.x=-Math.PI/2;
+  star.position.set(SAND.x, placeY(SAND)+.06, SAND.z+2.5);
+  scene.add(star);
+  const pl=new THREE.PointLight(0xe59a5e,.7,20); pl.position.set(SAND.x,3,SAND.z); scene.add(pl);
+}
+
+/* ---------- character builder ---------- */
+function label(text,color='#e59a5e'){
+  const c=document.createElement('canvas'); c.width=256; c.height=64;
+  const x=c.getContext('2d');
+  x.font='700 26px "Space Mono", monospace'; x.textAlign='center';
+  x.fillStyle=color; x.letterSpacing='6px';
+  x.fillText(text,128,42);
+  const tex=new THREE.CanvasTexture(c);
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false}));
+  s.scale.set(4.6,1.15,1);
+  return s;
+}
+function makeFigure({height=1.7, bodyColor=0x3a2c22, accent=0xe59a5e, emissive=.6, name=null}={}){
+  const g=new THREE.Group();
+  const bodyMat=new THREE.MeshStandardMaterial({color:bodyColor,roughness:.7,metalness:.25});
+  const accMat=new THREE.MeshStandardMaterial({color:accent,emissive:accent,emissiveIntensity:emissive,roughness:.4});
+  const legH=height*.42, torsoH=height*.36, headR=height*.13;
+  const legs=new THREE.Mesh(new THREE.CylinderGeometry(height*.09,height*.11,legH,8),bodyMat);
+  legs.position.y=legH/2; g.add(legs);
+  const torso=new THREE.Mesh(new THREE.CylinderGeometry(height*.14,height*.11,torsoH,8),bodyMat);
+  torso.position.y=legH+torsoH/2; g.add(torso);
+  const band=new THREE.Mesh(new THREE.TorusGeometry(height*.14,.025,6,24),accMat);
+  band.rotation.x=Math.PI/2; band.position.y=legH+torsoH*.75; g.add(band);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(headR,12,12),bodyMat);
+  head.position.y=legH+torsoH+headR*1.1; g.add(head);
+  const eye=new THREE.Mesh(new THREE.SphereGeometry(headR*.35,8,8),accMat);
+  eye.position.set(0,legH+torsoH+headR*1.15,headR*.8); g.add(eye);
+  if(name){ const s=label(name); s.position.y=height+1.0; g.add(s); }
+  return g;
+}
+
+/* ---------- NPCs ---------- */
+function placeY(v){
+  const d=Math.hypot(v.x,v.z);
+  let y=noise(v.x,v.z);
+  if(d<55) y*=d/55;
+  return y;
+}
+const npcs=[];
+function addNPC(id, pos, opts){
+  const fig=makeFigure(opts);
+  fig.position.set(pos.x, placeY(pos), pos.z);
+  scene.add(fig);
+  npcs.push({id, obj:fig, pos:fig.position});
+  tryLoadModel(id, fig);
+  return fig;
+}
+addNPC('kona', new THREE.Vector3(ARENA.x+9, 0, ARENA.z+20), {height:1.95, bodyColor:0x24303a, accent:0x7fd4e5, emissive:.9, name:'KONA-7'});
+addNPC('mimi', new THREE.Vector3(GARDEN.x-2, 0, GARDEN.z+3), {height:1.65, bodyColor:0x3a2230, accent:0xe5b05e, emissive:.9, name:'MIMI'});
+const ikaikaFig=addNPC('ikaika', new THREE.Vector3(SAND.x, 0, SAND.z), {height:1.15, bodyColor:0x4a3020, accent:0xe59a5e, emissive:1.0, name:'IKAIKA'});
+addNPC('andres', new THREE.Vector3(ARENA.x, 0, ARENA.z+21), {height:1.85, bodyColor:0x1f1a14, accent:0xc87f4a, emissive:.8, name:'ANDRÉS-7'});
+
+/* ---------- player ---------- */
+const player=makeFigure({height:1.7, bodyColor:0x33261b, accent:0xd9a441, emissive:.7});
+player.position.set(0, placeY(new THREE.Vector3(0,0,25)), 25);
+scene.add(player);
+tryLoadModel('player', player);
+let playerMoving=false;
+
+/* ---------- input ---------- */
+const keys={};
+addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;
+  if((e.key.toLowerCase()==='e'||e.key==='Enter') && talkTarget && dlgEl.style.display!=='block') interact();
+});
+addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
+
+/* joystick */
+const joy=document.getElementById('joy'), knob=document.getElementById('knob');
+let joyVec={x:0,y:0}, joyActive=false, joyCenter={x:0,y:0};
+function joyStart(e){
+  joyActive=true;
+  const r=joy.getBoundingClientRect();
+  joyCenter={x:r.left+r.width/2, y:r.top+r.height/2};
+  joyMove(e);
+}
+function joyMove(e){
+  if(!joyActive)return;
+  const t=e.touches?e.touches[0]:e;
+  let dx=t.clientX-joyCenter.x, dy=t.clientY-joyCenter.y;
+  const d=Math.hypot(dx,dy), max=42;
+  if(d>max){dx*=max/d;dy*=max/d;}
+  knob.style.transform=`translate(${dx}px,${dy}px)`;
+  joyVec={x:dx/max, y:dy/max};
+  e.preventDefault();
+}
+function joyEnd(){joyActive=false;joyVec={x:0,y:0};knob.style.transform='translate(0,0)';}
+joy.addEventListener('touchstart',joyStart,{passive:false});
+joy.addEventListener('touchmove',joyMove,{passive:false});
+joy.addEventListener('touchend',joyEnd);
+
+/* ---------- HUD ---------- */
+const meterEl=document.getElementById('meter'), objEl=document.getElementById('objective');
+function updateHUD(){
+  const n=state.frags.size;
+  let stars='';
+  for(let i=0;i<3;i++) stars += i<n?'<b>✦</b>':'✧';
+  meterEl.innerHTML=`${T.meter[lang]} ${stars}`;
+  objEl.textContent = state.gateOpen ? T.obj2[lang] : (state.talked.size>=3 ? T.obj1[lang] : T.obj0[lang]);
+}
+
+/* ---------- dialogue UI ---------- */
+const dlgEl=document.getElementById('dlg'), dlgName=document.getElementById('dlgName'),
+      dlgText=document.getElementById('dlgText'), dlgChoices=document.getElementById('dlgChoices'),
+      talkBtn=document.getElementById('talkBtn');
+let talkTarget=null;
+
+function interact(){
+  if(!talkTarget) return;
+  if(talkTarget==='CENTER'){ startFinale(); return; }
+  openDialog(talkTarget);
+}
+talkBtn.addEventListener('click',interact);
+
+function openDialog(id){
+  const d=DLG[id];
+  dlgEl.style.display='block'; talkBtn.style.display='none';
+  dlgName.textContent=d.name;
+  if(state.talked.has(id)){
+    dlgText.innerHTML=d.done[lang];
+    dlgChoices.innerHTML=`<button class="dchoice"><span class="n">00</span>${T.close[lang]}</button>`;
+    dlgChoices.firstChild.onclick=closeDialog;
+    return;
+  }
+  dlgText.innerHTML=d.intro[lang];
+  dlgChoices.innerHTML='';
+  d.choices.forEach((c,i)=>{
+    const b=document.createElement('button');
+    b.className='dchoice';
+    b.innerHTML=`<span class="n">0${i+1}</span>${c[lang]}`;
+    b.onclick=()=>{
+      state.talked.add(id);
+      if(id==='andres') state.gateOpen=true;
+      let html=c.res?c.res[lang]:d.done[lang];
+      if(c.gain){ state.frags.add(c.gain); html+=`<div class="gainLine">${T.gained[lang]}${FRAGS[c.gain][lang]}</div>`; }
+      dlgText.innerHTML=html;
+      dlgChoices.innerHTML=`<button class="dchoice"><span class="n">00</span>${T.close[lang]}</button>`;
+      dlgChoices.firstChild.onclick=closeDialog;
+      updateHUD();
+    };
+    dlgChoices.appendChild(b);
+  });
+}
+function closeDialog(){ dlgEl.style.display='none'; }
+
+/* ---------- finale ---------- */
+let ale=null, particles=null, finaleT=0;
+function startFinale(){
+  if(state.finale) return;
+  state.finale=true; closeDialog(); talkBtn.style.display='none';
+  // A.L.E. appears at arena center
+  ale=makeFigure({height:2.1, bodyColor:0x2b1d2e, accent:0xd9a441, emissive:1.4, name:'A.L.E.'});
+  ale.position.set(ARENA.x, .5, ARENA.z); scene.add(ale);
+  tryLoadModel('ale', ale);
+  // particle column
+  const N=400, arr=new Float32Array(N*3);
+  for(let i=0;i<N;i++){
+    const a=Math.random()*Math.PI*2, r=Math.random()*10;
+    arr[i*3]=ARENA.x+Math.cos(a)*r; arr[i*3+1]=Math.random()*24; arr[i*3+2]=ARENA.z+Math.sin(a)*r;
+  }
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(arr,3));
+  particles=new THREE.Points(g,new THREE.PointsMaterial({color:0xe5b05e,size:.22,transparent:true,opacity:.9}));
+  scene.add(particles);
+  setTimeout(showEnding, 7000);
+}
+function showEnding(){
+  const key=state.frags.size===3?'full':(state.frags.size>=1?'partial':'wind');
+  const E=ENDINGS[key];
+  document.getElementById('endEra').textContent=E.era[lang];
+  document.getElementById('endTitle').textContent=E.title[lang];
+  document.getElementById('endBody').innerHTML=E[lang];
+  document.getElementById('againBtn').textContent=T.again[lang];
+  document.getElementById('ending').style.display='flex';
+}
+
+/* ---------- intro ---------- */
+function fillIntro(){
+  document.getElementById('inEra').textContent=T.inEra[lang];
+  document.getElementById('inTitle').textContent=T.inTitle[lang];
+  document.getElementById('inP1').textContent=T.inP1[lang];
+  document.getElementById('inP2').textContent=T.inP2[lang];
+  document.getElementById('inKeys').textContent=T.inKeys[lang];
+  document.getElementById('startBtn').textContent=T.start[lang];
+}
+fillIntro(); updateHUD();
+document.getElementById('startBtn').onclick=()=>{
+  document.getElementById('intro').style.display='none';
+  state.playing=true;
+};
+document.getElementById('langBtn').onclick=()=>{
+  lang=lang==='es'?'en':'es';
+  document.getElementById('langBtn').textContent=lang==='es'?'EN':'ES';
+  document.documentElement.lang=lang;
+  fillIntro(); updateHUD();
+  if(dlgEl.style.display==='block' && talkTarget && talkTarget!=='CENTER') openDialog(talkTarget);
+};
+
+/* ---------- loop ---------- */
+const clock=new THREE.Clock();
+const camOffset=new THREE.Vector3(0,5.5,9);
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),.05);
+  const t=clock.elapsedTime;
+
+  /* movement */
+  if(state.playing && !state.finale && dlgEl.style.display!=='block'){
+    let mx=0,mz=0;
+    if(keys['w']||keys['arrowup'])mz-=1;
+    if(keys['s']||keys['arrowdown'])mz+=1;
+    if(keys['a']||keys['arrowleft'])mx-=1;
+    if(keys['d']||keys['arrowright'])mx+=1;
+    mx+=joyVec.x; mz+=joyVec.y;
+    const len=Math.hypot(mx,mz);
+    playerMoving = len>0.05;
+    if(playerMoving){
+      mx/=Math.max(len,1); mz/=Math.max(len,1);
+      const speed=9;
+      player.position.x+=mx*speed*dt;
+      player.position.z+=mz*speed*dt;
+      const d=Math.hypot(player.position.x,player.position.z);
+      if(d>110){player.position.x*=110/d;player.position.z*=110/d;}
+      player.position.y=placeY(player.position);
+      player.rotation.y=Math.atan2(mx,mz);
+      player.position.y+=Math.abs(Math.sin(t*10))*.06; // step bounce
+    }
+  }
+
+  /* proximity */
+  if(state.playing && !state.finale){
+    talkTarget=null;
+    let best=1e9;
+    for(const n of npcs){
+      const d=player.position.distanceTo(n.pos);
+      if(d<4.5 && d<best){best=d;talkTarget=n.id;}
+    }
+    // arena center after gate open
+    if(state.gateOpen){
+      const dc=player.position.distanceTo(new THREE.Vector3(ARENA.x,player.position.y,ARENA.z));
+      if(dc<5 && dc<best){talkTarget='CENTER';}
+    }
+    if(talkTarget && dlgEl.style.display!=='block'){
+      talkBtn.style.display='block';
+      talkBtn.textContent= talkTarget==='CENTER'? T.enter[lang] : T.talk[lang];
+    } else talkBtn.style.display='none';
+  }
+
+  /* GLB animations */
+  mixers.forEach(m=>m.update(dt));
+  setAnim('player', playerMoving && !state.finale ? 'walk' : 'idle');
+
+  /* idle animations */
+  window._crystal.rotation.y+=dt*.8;
+  window._crystal.position.y=3.6+Math.sin(t*1.4)*.25;
+  npcs.forEach((n,i)=>{ n.obj.position.y=placeY(n.pos)+Math.sin(t*1.6+i)*.05; n.obj.rotation.y=Math.sin(t*.4+i*2)*.4; });
+  ikaikaFig.lookAt(player.position.x, ikaikaFig.position.y, player.position.z);
+
+  /* finale fx */
+  if(state.finale){
+    finaleT+=dt;
+    arenaRings.forEach((r,i)=>{ r.material.emissiveIntensity=.5+Math.sin(finaleT*3+i)*0.5+finaleT*.15; r.rotation.z+=dt*(.2+i*.15); });
+    window._arenaLight.intensity=1.4+finaleT*.6+Math.sin(finaleT*6)*.5;
+    if(ale){ ale.position.y=.5+Math.sin(finaleT*1.2)*.3+finaleT*.05; ale.rotation.y+=dt*.4; }
+    if(particles){
+      const p=particles.geometry.attributes.position;
+      for(let i=0;i<p.count;i++){
+        let y=p.getY(i)+dt*(2+Math.random()*3);
+        if(y>26)y=0;
+        p.setY(i,y);
+      }
+      p.needsUpdate=true;
+    }
+    // slow camera orbit of the arena
+    const a=finaleT*.25;
+    camera.position.lerp(new THREE.Vector3(ARENA.x+Math.sin(a)*26, 12, ARENA.z+Math.cos(a)*26), .04);
+    camera.lookAt(ARENA.x, 4, ARENA.z);
+  } else {
+    /* follow cam */
+    const target=player.position.clone().add(camOffset);
+    camera.position.lerp(target,.08);
+    camera.lookAt(player.position.x, player.position.y+1.6, player.position.z);
+  }
+
+  renderer.render(scene,camera);
+}
+animate();
+</script>
+</body>
+</html>
